@@ -75,13 +75,21 @@ async def send_message(
         
         # check if client disconnected (stop generating pressed)
         if await request.is_disconnected():
+            # Rollback: Remove the user message so it doesn't appear in history
+            if is_new_chat:
+                await repository.delete_chat_session(db, session_id)
+            else:
+                await repository.remove_last_message(db, session_id)
             return
 
         # construct simulated rich response with markdown
         ai_response_text = (
             "Here is the **Bank Leumi** analysis:\n\n"  # Double \n for new paragraph
-            "* Trend: **Positive**\n"
-            "* Risk: _Medium_\n\n"                      # Double \n before link
+            "| Metric | Value |\n"
+            "| :--- | :--- |\n"
+            "| Trend | **Positive** |\n"
+            "| Risk | _Medium_ |\n"
+            "| Volume | 12.5M |\n\n"
             "[Click here for TASE page](https://www.tase.co.il)"
         )
         

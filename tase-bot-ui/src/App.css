@@ -6,7 +6,7 @@
   --accent: #007acc;
   --text-main: #ffffff;
   --text-muted: #cccccc;
-  --border-color: #333;
+  --border-color: rgba(255, 255, 255, 0.2);
   --bg-assistant-bubble: #333333;
   --bg-sidebar-hover: #37373d;
   --bg-sidebar-active: #2d2d33;
@@ -32,7 +32,7 @@
   --accent: #4caf50;
   --text-main: #e8f5e9;
   --text-muted: #a5d6a7;
-  --border-color: #2e4c2e;
+  --border-color: rgba(255, 255, 255, 0.2);
   --bg-assistant-bubble: #2e4c2e;
   --bg-sidebar-hover: #2f4f2f;
   --bg-sidebar-active: #355e35;
@@ -696,4 +696,19 @@ body {
     background: rgba(0,0,0,0.5);
     z-index: 40;
   }
+}
+
+/* --- Markdown Table Styling --- */
+.message-bubble table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 10px 0;
+  font-size: 0.9rem;
+}
+
+.message-bubble th, 
+.message-bubble td {
+  border: 1px solid var(--border-color);
+  padding: 8px;
+  text-align: left;
 }

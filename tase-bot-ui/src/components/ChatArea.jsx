@@ -1,6 +1,7 @@
 import ReactMarkdown from 'react-markdown';
-// placeholder for future chart rendering tools
+import remarkGfm from 'remark-gfm';
 import { useEffect, useRef } from 'react';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
 /**
  * renders the chat interface including message history and input area.
@@ -29,7 +30,7 @@ export default function ChatArea({ messages, input, setInput, loading, onSend, o
   };
 
   return (
-    <div className="chat-area">
+    <div className="chat-area" style={{ minWidth: 0 }}>
       <div className="messages-box">
         {messages.length === 0 && (
           <div className="welcome-msg" style={{textAlign: 'center', marginTop: '20%', color: '#666'}}>
@@ -40,17 +41,42 @@ export default function ChatArea({ messages, input, setInput, loading, onSend, o
         {messages.map((msg, idx) => (
           <div key={idx} className={`message-row ${msg.role}`}>
             <div className="message-content-wrapper">
-            <div className="message-bubble">
+            <div className="message-bubble" style={{ overflowWrap: 'anywhere' }}>
               {/* render text with markdown */}
-                <ReactMarkdown>{msg.content}</ReactMarkdown>
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  components={{
+                    table: ({node, ...props}) => (
+                      <div style={{ overflowX: 'auto', maxWidth: '100%', marginBottom: '10px' }}>
+                        <table {...props} style={{ borderCollapse: 'collapse', width: '100%' }} />
+                      </div>
+                    ),
+                    pre: ({node, ...props}) => (
+                      <div style={{ overflowX: 'auto', maxWidth: '100%', borderRadius: '4px' }}>
+                        <pre {...props} />
+                      </div>
+                    )
+                  }}
+                >
+                  {msg.content}
+                </ReactMarkdown>
 
                 {/* check for graphs in metadata */}
                 {msg.metadata?.type === 'chart' && (
-                <div className="chart-container" style={{marginTop: '10px', height: '200px'}}>
-                    {/* placeholder for future graph component - uses css class for theming */}
-                    <div className="chart-placeholder">
-                        Graph Data: {msg.metadata.chart_data.length} points
-                    </div>
+                <div className="chart-container" style={{marginTop: '15px', height: '250px', width: '100%', minWidth: '300px', maxWidth: '500px'}}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={msg.metadata.chart_data}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
+                        <XAxis dataKey="name" stroke="var(--text-muted)" tick={{fill: 'var(--text-muted)'}} />
+                        <YAxis stroke="var(--text-muted)" tick={{fill: 'var(--text-muted)'}} />
+                        <Tooltip 
+                          contentStyle={{ backgroundColor: 'var(--bg-sidebar)', border: '1px solid var(--border-color)', borderRadius: '4px', color: 'var(--text-main)' }}
+                          itemStyle={{ color: 'var(--text-main)' }}
+                          cursor={{fill: 'var(--bg-sidebar-hover)'}}
+                        />
+                        <Bar dataKey="value" fill="var(--accent)" radius={[4, 4, 0, 0]} barSize={40} />
+                      </BarChart>
+                    </ResponsiveContainer>
                 </div>
                 )}
 
@@ -61,6 +87,13 @@ export default function ChatArea({ messages, input, setInput, loading, onSend, o
                 </div>
                 )}
             </div>
+
+            {/* Stopped Indicator */}
+            {msg.stopped && (
+              <div style={{ fontSize: '0.75rem', color: '#ff6b6b', marginTop: '4px', fontStyle: 'italic', textAlign: 'right' }}>
+                Stopped by user
+              </div>
+            )}
 
             {/* execution time - outside bubble */}
             {msg.metadata?.execution_time && (

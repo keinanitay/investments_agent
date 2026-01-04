@@ -205,6 +205,14 @@ function App() {
     } catch (err) {
       if (axios.isCancel(err)) {
         console.log("Request cancelled by user");
+        // Mark the last message (user's message) as stopped locally
+        setMessages(prev => {
+          const last = prev[prev.length - 1];
+          if (last && last.role === 'user') {
+             return [...prev.slice(0, -1), { ...last, stopped: true }];
+          }
+          return prev;
+        });
       } else {
         console.error(err);
         toast.error("Failed to send message");

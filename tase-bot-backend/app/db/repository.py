@@ -101,3 +101,13 @@ async def rename_chat_session(db: Database, session_id: str, new_title: str) -> 
         {"$set": {"title": new_title}}
     )
     return result.matched_count > 0
+
+async def remove_last_message(db: Database, session_id: str) -> bool:
+    """removes the last message from a chat session (used for rollback)."""
+    if not ObjectId.is_valid(session_id):
+        return False
+    result = await db["chats"].update_one(
+        {"_id": ObjectId(session_id)},
+        {"$pop": {"messages": 1}}
+    )
+    return result.matched_count > 0
