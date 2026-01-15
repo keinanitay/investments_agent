@@ -6,3 +6,4 @@ python-dotenv>=1.0.0
 passlib[bcrypt]
 bcrypt==3.2.2
 python-jose[cryptography]
+openai>=1.0.0
