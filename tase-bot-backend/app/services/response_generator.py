@@ -4,6 +4,7 @@ from typing import List, Dict, Any, Optional, Tuple
 from openai import AsyncOpenAI
 from dotenv import load_dotenv
 import logging
+from app.db import repository
 
 load_dotenv()
 
@@ -129,6 +130,8 @@ def format_chat_history(messages: List[Dict[str, Any]]) -> List[Dict[str, str]]:
 async def generate_response(
     user_message: str,
     chat_history: List[Dict[str, Any]],
+    db: Any,
+    user_id: str,
     user_context: Optional[Dict[str, Any]] = None
 ) -> Tuple[str, Dict[str, Any]]:
     """
@@ -137,7 +140,9 @@ async def generate_response(
     Args:
         user_message: The current user message
         chat_history: List of previous messages in the conversation
-        user_context: Optional user-specific context (risk level, preferences, etc.)
+        db: Database connection
+        user_id: User ID to query risk level from MongoDB
+        user_context: Optional user-specific context (for backward compatibility)
     
     Returns:
         Tuple of (response_text, metadata_dict)
@@ -165,12 +170,24 @@ async def generate_response(
             "content": user_message
         })
         
-        # Build system prompt with optional user context
+        # Build system prompt and add user risk level from MongoDB
         system_prompt = build_system_prompt()
-        if user_context:
-            risk_level = user_context.get("risk_level", "")
-            if risk_level:
-                system_prompt += f"\n\nUser Context: The user's risk level is {risk_level}. Consider this when providing investment advice."
+        
+        # Query MongoDB to get the user's risk level
+        try:
+            user = await repository.get_user_by_id(db, user_id)
+            if user:
+                risk_level = user.get("risk_level", "Medium")
+                if risk_level:
+                    system_prompt += f"\n\nUser Context: The user's risk level is {risk_level}. Consider this when providing investment advice. Adjust your recommendations and explanations to match the user's risk tolerance level."
+                    logger.info(f"Added user risk level to system prompt: {risk_level}")
+        except Exception as e:
+            logger.warning(f"Failed to retrieve user risk level from MongoDB: {str(e)}")
+            # Fallback to user_context if MongoDB query fails
+            if user_context:
+                risk_level = user_context.get("risk_level", "")
+                if risk_level:
+                    system_prompt += f"\n\nUser Context: The user's risk level is {risk_level}. Consider this when providing investment advice."
         
         # Prepare messages for API call
         api_messages = [

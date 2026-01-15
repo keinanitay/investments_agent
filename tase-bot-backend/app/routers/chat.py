@@ -77,17 +77,13 @@ async def send_message(
             # Get all messages except the last one (which is the current user message we just added)
             chat_history = chat_session["messages"][:-1]
         
-        # Prepare user context for personalized responses
-        user_context = {
-            "risk_level": current_user.get("risk_level", "Medium"),
-            "username": current_user.get("username", "user")
-        }
-        
         # Generate AI response using the response generator service
+        # The response generator will query MongoDB directly for the user's risk level
         ai_response_text, ai_metadata = await generate_response(
             user_message=payload.content,
             chat_history=chat_history,
-            user_context=user_context
+            db=db,
+            user_id=user_id
         )
         
         # Check if client disconnected (stop generating pressed)
