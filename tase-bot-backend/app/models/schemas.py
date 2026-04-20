@@ -37,3 +37,12 @@ class ChatSession(BaseModel):
     class Config:
         populate_by_name = True
         arbitrary_types_allowed = True
+
+class NewsArticle(BaseModel):
+    id: Optional[PyObjectId] = Field(alias="_id", default=None)
+    title: str
+    url: str
+    source: str = "Bizportal"
+    content: str
+    published_at: datetime
+    created_at: datetime = Field(default_factory=datetime.utcnow)
