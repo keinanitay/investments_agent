@@ -4,7 +4,9 @@ from typing import List, Dict, Any, Optional, Tuple
 from openai import AsyncOpenAI
 from dotenv import load_dotenv
 import logging
-from app.db import repository
+from db import repository
+from app.services.vector_search import vector_search_articles
+
 
 load_dotenv()
 
@@ -189,6 +191,23 @@ async def generate_response(
                 if risk_level:
                     system_prompt += f"\n\nUser Context: The user's risk level is {risk_level}. Consider this when providing investment advice."
         
+        # Check database for relevant news articles (RAG Injection)
+        articles = await vector_search_articles(user_message, db["news_articles"], limit=5)
+        sources_metadata = []
+        
+        if articles:
+            system_prompt += "\n\nRELEVANT LIVE NEWS CONTEXT (Use this to answer the prompt if relevant):\n"
+            for i, doc in enumerate(articles, 1):
+                system_prompt += f"\n[SOURCE {i}] {doc.get('title', '')}\nSummary: {doc.get('content', '')}\n"
+                sources_metadata.append({
+                    "name": doc.get('title', 'Unknown News Title'),
+                    "url": doc.get('url', '#'),
+                    "source": doc.get('source', 'Unknown Publisher')
+                })
+        else:
+            system_prompt += "\n\n(No breaking news context found for this query in the database.)"
+            sources_metadata.append({"name": "TASE Bot AI"})
+        
         # Prepare messages for API call
         api_messages = [
             {"role": "system", "content": system_prompt}
@@ -213,7 +232,7 @@ async def generate_response(
         # Build metadata
         metadata = {
             "type": "text",
-            "sources": [{"name": "TASE Bot AI"}],
+            "sources": sources_metadata,
             "execution_time": execution_time,
             "model": OPENAI_MODEL,
             "tokens_used": response.usage.total_tokens if hasattr(response, 'usage') else None

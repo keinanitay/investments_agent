@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends, status
 from fastapi.security import OAuth2PasswordBearer
-from app.db.database import get_database
-from app.db import repository
+from db.database import get_database
+from db import repository
 from app.models.schemas import UserCreate, UserInDB, UserUpdate
 from datetime import datetime, timedelta
 from passlib.context import CryptContext

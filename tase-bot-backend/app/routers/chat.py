@@ -2,8 +2,8 @@ from fastapi import APIRouter, HTTPException, Body, Depends, Request
 import asyncio
 import time
 import logging
-from app.db.database import get_database
-from app.db import repository
+from db.database import get_database
+from db import repository
 from app.models.schemas import ChatMessage, ChatSession
 from app.routers.auth import get_current_user
 from app.services.response_generator import generate_response, generate_chat_title
