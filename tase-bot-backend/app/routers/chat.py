@@ -1,12 +1,16 @@
 from fastapi import APIRouter, HTTPException, Body, Depends, Request
 import asyncio
 import time
+import logging
 from app.db.database import get_database
 from app.db import repository
 from app.models.schemas import ChatMessage, ChatSession
 from app.routers.auth import get_current_user
+from app.services.response_generator import generate_response, generate_chat_title
 from typing import List, Optional
 from pydantic import BaseModel
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -46,34 +50,43 @@ async def send_message(
     else:
         is_new_chat = True
 
+    # Initialize title variable
+    dynamic_title = None
+    temp_title = "New Chat"
+    
     # handle new chat creation if needed
     if is_new_chat:
-        # get user details for the title
-        username = current_user.get("username", "user")
-        
-        # calculate next chat number for the title
-        current_count = await repository.count_user_chats(db, user_id)
-        next_number = current_count + 1
-        
-        # generate title: usr_{username}_chat_{number}
-        dynamic_title = f"usr_{username}_chat_{next_number}"
-        
+        # Use a temporary title initially - will be updated after AI response
         new_session = ChatSession(
             user_id=user_id,
-            title=dynamic_title,
+            title=temp_title,
             messages=[user_msg]
         )
         
         session_id = await repository.create_chat_session(db, new_session.model_dump(by_alias=True, exclude=["id"]))
 
     # ----------------------------
-    # simulated ai logic - REPLACE WITH LLM GENERATED RESPONSES:
-    # this is where the actual ai response generation should be plugged in
+    # Generate AI response based on context
     try:
         start_ts = time.time()
-        await asyncio.sleep(2.5) # simulate processing delay
         
-        # check if client disconnected (stop generating pressed)
+        # Get chat history for context (excluding the just-added user message)
+        chat_session = await repository.get_chat_session(db, session_id, user_id)
+        chat_history = []
+        if chat_session and "messages" in chat_session:
+            # Get all messages except the last one (which is the current user message we just added)
+            chat_history = chat_session["messages"][:-1]
+        
+        # Generate AI response using the response generator service
+        # The response generator will query MongoDB directly for the user's risk level
+        ai_response_text, ai_metadata = await generate_response(
+            user_message=payload.content,
+            chat_history=chat_history,
+            db=db,
+            user_id=user_id
+        )
+        
+        # Check if client disconnected (stop generating pressed)
         if await request.is_disconnected():
             # Rollback: Remove the user message so it doesn't appear in history
             if is_new_chat:
@@ -82,39 +95,27 @@ async def send_message(
                 await repository.remove_last_message(db, session_id)
             return
 
-        # construct simulated rich response with markdown
-        ai_response_text = (
-            "Here is the **Bank Leumi** analysis:\n\n"  # Double \n for new paragraph
-            "| Metric | Value |\n"
-            "| :--- | :--- |\n"
-            "| Trend | **Positive** |\n"
-            "| Risk | _Medium_ |\n"
-            "| Volume | 12.5M |\n\n"
-            "[Click here for TASE page](https://www.tase.co.il)"
-        )
-        
-        # add metadata for charts and sources
-        ai_metadata = {
-            "type": "chart",
-            "chart_data": [
-                {"name": "Jan", "value": 100},
-                {"name": "Feb", "value": 120},
-                {"name": "Mar", "value": 110},
-                {"name": "Apr", "value": 140}
-            ],
-            "sources": [{"name": "TASE API"}, {"name": "Bizportal"}],
-            "execution_time": time.time() - start_ts
-        }
-
+        # Create AI message object
         ai_msg = ChatMessage(
             role="assistant", 
             content=ai_response_text,
             metadata=ai_metadata
         )
-        # ----------------------------------
 
-        # save ai response to database
+        # Save AI response to database
         await repository.append_ai_message(db, session_id, ai_msg.model_dump())
+        
+        # Generate and update chat title for new chats based on first user message
+        if is_new_chat:
+            try:
+                generated_title = await generate_chat_title(payload.content)
+                # Update the title in MongoDB
+                await repository.rename_chat_session(db, session_id, generated_title)
+                dynamic_title = generated_title
+            except Exception as e:
+                # If title generation fails, keep the temporary title
+                logger.error(f"Failed to generate chat title: {str(e)}")
+                dynamic_title = temp_title
 
     except asyncio.CancelledError:
         raise
