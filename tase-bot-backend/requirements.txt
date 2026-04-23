@@ -8,3 +8,4 @@ bcrypt==3.2.2
 python-jose[cryptography]
 feedparser>=6.0.10
 beautifulsoup4>=4.12.0
+sentence-transformers>=2.2.0

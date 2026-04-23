@@ -46,3 +46,4 @@ class NewsArticle(BaseModel):
     content: str
     published_at: datetime
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    embedding: Optional[List[float]] = None
